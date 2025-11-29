@@ -1,9 +1,12 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\savchenko\\source\\repos\\Client\\",
+  "WorkspaceRootPath": "C:\\Users\\savchenko\\source\\repos\\pr5\\Client\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{89CD2921-07EC-4000-9A1D-AFADBC558507}|Client\\Client.csproj|c:\\users\\savchenko\\source\\repos\\client\\client\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{2F988AF6-43CA-4E71-AAA5-4154CAE13149}|..\\Server\\Server.csproj|c:\\users\\savchenko\\source\\repos\\pr5\\server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{89CD2921-07EC-4000-9A1D-AFADBC558507}|Client\\Client.csproj|C:\\Users\\savchenko\\source\\repos\\pr5\\Client\\client\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{89CD2921-07EC-4000-9A1D-AFADBC558507}|Client\\Client.csproj|solutionrelative:client\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -20,14 +23,26 @@
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\savchenko\\source\\repos\\Client\\Client\\Program.cs",
-              "RelativeDocumentMoniker": "Client\\Program.cs",
-              "ToolTip": "C:\\Users\\savchenko\\source\\repos\\Client\\Client\\Program.cs",
-              "RelativeToolTip": "Client\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "DocumentMoniker": "C:\\Users\\savchenko\\source\\repos\\pr5\\Server\\Program.cs",
+              "RelativeDocumentMoniker": "..\\Server\\Program.cs",
+              "ToolTip": "C:\\Users\\savchenko\\source\\repos\\pr5\\Server\\Program.cs",
+              "RelativeToolTip": "..\\Server\\Program.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAAwDgAAAAcAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-11-29T19:31:27.862Z",
+              "WhenOpened": "2025-11-29T19:46:21.495Z",
               "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\savchenko\\source\\repos\\pr5\\Client\\Client\\Program.cs",
+              "RelativeDocumentMoniker": "Client\\Program.cs",
+              "ToolTip": "C:\\Users\\savchenko\\source\\repos\\pr5\\Client\\Client\\Program.cs",
+              "RelativeToolTip": "Client\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-29T19:31:27.862Z"
             }
           ]
         }
