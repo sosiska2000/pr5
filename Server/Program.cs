@@ -19,7 +19,29 @@ namespace Client
         static DateTime ClientDateConnection;
         static void Main(string[] args)
         {
+            OnSettings();
 
+            Thread tCheckToken = new Thread(CheckToken);
+            tCheckToken.Start();
+
+            while (true) 
+            { 
+                SetCommand();
+            }
+        }
+
+        static void SetCommand()
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            string Command = Console.ReadLine();
+            if (Command == "/config")
+            {
+                File.Delete(Directory.GetCurrentDirectory() + "/../config");
+                OnSettings();
+            }
+            else if (Command == "/connect") ConnectServer();
+            else if (Command == "/status") GetStatus();
+            else if (Command == "/help") Help();
         }
 
         public static void ConnectServer()
@@ -34,6 +56,7 @@ namespace Client
 
             IPEndPoint endPoint = new IPEndPoint(ServerIpAddress, ServerPort);
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
             socket.Connect(endPoint);
 
             string msg = $"/connect {login} {password}";
@@ -70,6 +93,7 @@ namespace Client
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("Успешное подключение. Ваш токен: " + ClientToken);
         }
+
         public static void CheckToken()
         {
             while (true)
@@ -110,20 +134,20 @@ namespace Client
                         }
                     }
                 }
-
                 Thread.Sleep(1000);
             }
-
-
         }
+
         public static void GetStatus()
         {
             int Duration = (int)DateTime.Now.Subtract(ClientDateConnection).TotalSeconds;
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"Client: {ClientToken}, time connection: {ClientDateConnection.ToString("HH:mm:ss dd.MM")}, " +
+            Console.WriteLine($"Client: {ClientToken}," +
+                $" time connection: {ClientDateConnection.ToString("HH:mm:ss dd.MM")}, " +
                 $"duration: {Duration}"
                 );
         }
+
         public static void OnSettings()
         {
             string Path = Directory.GetCurrentDirectory() + "/.config";
@@ -174,7 +198,7 @@ namespace Client
         static void Help()
         {
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Commands to the server: ");
+            Console.WriteLine("Commands to the clients: ");
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("/config");
             Console.ForegroundColor = ConsoleColor.White;
