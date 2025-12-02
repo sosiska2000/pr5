@@ -1,237 +1,466 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-namespace Server{
-    class Program
+namespace Client
+{
+    public class Program
     {
         static IPAddress ServerIPAddress;
         static int ServerPort;
-        static int MaxClient;
-        static int Duration;
+        static int CheckInterval;
 
-        static List<Client.Classes.Client> AllClients = new List<Client.Classes.Client>();
+        static string ClientToken;
+        static string ClientUsername;
+        static DateTime ClientConnectDate;
+        static bool IsConnected = false;
 
         static void Main(string[] args)
         {
+            Console.Title = "License Client";
             OnSettings();
 
-            Thread tListner = new Thread(ConnectServer);
-            tListner.Start();
-
-            Thread tDisconnect = new Thread(CheckDisconnectClient);
-            tDisconnect.Start();
-
-            while (true) SetCommand();
-        }
-        static void CheckDisconnectClient()
-        {
             while (true)
             {
-                for (int iClient = 0; iClient < AllClients.Count; iClient++)
-                {
-                    int ClientDuration = (int)DateTime.Now.Subtract(AllClients[iClient].DateConnect).TotalSeconds;
-
-                    if (ClientDuration > Duration)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Client: {AllClients[iClient].Token} disconnect from server due to timeout");
-                    }
-                }
-                Thread.Sleep(1000);
+                SetCommand();
             }
         }
 
         static void SetCommand()
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            string Command = Console.ReadLine();
-            if (Command == "/config")
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("Client> ");
+            Console.ForegroundColor = ConsoleColor.White;
+
+            string command = Console.ReadLine();
+
+            if (command == "/config")
             {
-                File.Delete(Directory.GetCurrentDirectory() + "/../config");
+                File.Delete("client.config");
                 OnSettings();
             }
-            else if (Command.Contains("/disconnect")) DisconnectServer(Command);
-            else if (Command == "/status") GetStatus();
-            else if (Command == "/help") Help();
-        }
-        static string SetCommandClient(string Command)
-        {
-            if (Command == "/token")
+            else if (command == "/connect" || command == "/auth")
             {
-                if (AllClients.Count < MaxClient)
-                {
-                    Client.Classes.Client newClient = new Client.Classes.Client();
-                    AllClients.Add(newClient);
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"New client connection: " + newClient.Token);
-
-                    return newClient.Token;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"There is not enough space on the license server");
-                    return "/limit";
-                }
+                Authenticate();
+            }
+            else if (command == "/disconnect")
+            {
+                Disconnect();
+            }
+            else if (command == "/status")
+            {
+                GetStatus();
+            }
+            else if (command == "/help")
+            {
+                Help();
+            }
+            else if (command == "/clear")
+            {
+                Console.Clear();
+            }
+            else if (command == "/server")
+            {
+                GetServerStatus();
             }
             else
             {
-                Client.Classes.Client Client = AllClients.Find(x => x.Token == Command);
-                return Client != null ? "/connect" : "/disconnect";
-            }
-            return null;
-        }
-        static void DisconnectServer(string command)
-        {
-           try
-           { 
-                string Token = command.Replace("/disconnect ", "");
-                Client.Classes.Client DisconnectClient = AllClients.Find(x => x.Token == Token);
-                AllClients.Remove(DisconnectClient);
-                
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Client: {Token} disconnect from server");
-           }
-           catch (Exception ex)
-           {
+                Console.WriteLine("Unknown command. Type /help for available commands.");
+            }
+        }
+
+        public static void Authenticate()
+        {
+            if (IsConnected)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Already connected. Disconnect first.");
+                return;
+            }
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Username: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string username = Console.ReadLine();
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Password: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+
+            // Скрываем ввод пароля
+            string password = "";
+            ConsoleKeyInfo key;
+            do
+            {
+                key = Console.ReadKey(true);
+
+                if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
+                {
+                    password += key.KeyChar;
+                    Console.Write("*");
+                }
+                else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
+                {
+                    password = password.Substring(0, (password.Length - 1));
+                    Console.Write("\b \b");
+                }
+            } while (key.Key != ConsoleKey.Enter);
+
+            Console.WriteLine();
+
+            try
+            {
+                IPEndPoint endPoint = new IPEndPoint(ServerIPAddress, ServerPort);
+                using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                {
+                    socket.Connect(endPoint);
+
+                    string message = $"/auth {username} {password}";
+                    socket.Send(Encoding.UTF8.GetBytes(message));
+
+                    byte[] buffer = new byte[1024];
+                    int size = socket.Receive(buffer);
+                    string response = Encoding.UTF8.GetString(buffer, 0, size);
+                    string[] responseParts = response.Split(' ');
+
+                    if (responseParts[0] == "/auth_fail")
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Authentication failed: Invalid username or password.");
+                        return;
+                    }
+
+                    if (response == "/banned")
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Your account is banned!");
+                        return;
+                    }
+
+                    if (response == "/limit")
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("No available licenses.");
+                        return;
+                    }
+
+                    if (responseParts[0] == "/error")
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Server error: {response.Substring(6)}");
+                        return;
+                    }
+
+                    if (responseParts[0] == "/token")
+                    {
+                        ClientToken = responseParts[1];
+                        ClientUsername = username;
+                        ClientConnectDate = DateTime.Now;
+                        IsConnected = true;
+
+                        // Запускаем поток для проверки токена
+                        Thread checkThread = new Thread(CheckToken);
+                        checkThread.Start();
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"\nSuccessfully connected!");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.WriteLine($"Username: {username}");
+                        Console.WriteLine($"Token: {ClientToken}");
+                        Console.WriteLine($"Connection time: {ClientConnectDate.ToString("HH:mm:ss dd.MM.yyyy")}");
+
+                        // Запускаем поток для периодической проверки статуса
+                        Thread statusThread = new Thread(() => PeriodicallyCheckServerStatus(CheckInterval));
+                        statusThread.Start();
+                    }
+                }
+            }
+            catch (SocketException)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Cannot connect to server. Check server address and port.");
+            }
+            catch (Exception ex)
+            {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Error: {ex.Message}");
-           }
-        }
-        static void ConnectServer()
-        {
-            IPEndPoint EndPoint = new IPEndPoint(ServerIPAddress, ServerPort);
-            Socket SocketListener = new Socket(
-                AddressFamily.InterNetwork,
-                SocketType.Stream,
-                ProtocolType.Tcp);
-            SocketListener.Bind(EndPoint);
-            SocketListener.Listen(10);
-
-            while (true)
-            {
-                Socket Handler = SocketListener.Accept();
-
-                byte[] Bytes = new byte[10485760];
-                int ByteRec = Handler.Receive(Bytes);
-
-                string Message = Encoding.UTF8.GetString(Bytes, 0, ByteRec);
-                string Response = SetCommandClient(Message);
-
-                Handler.Send(Encoding.UTF8.GetBytes(Response));
-            }
-
-
-        }
-        static void GetStatus()
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Count clients: {AllClients.Count}");
-
-            foreach (Client.Classes.Client Client in AllClients)
-            {
-                int Duration = (int)DateTime.Now.Subtract(Client.DateConnect).TotalSeconds;
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"Client: {Client.Token}, time connection: {Client.DateConnect.ToString("HH:mm:ss dd.MM")}, duration: {Duration}");
             }
         }
+
+        public static void CheckToken()
+        {
+            while (IsConnected)
+            {
+                try
+                {
+                    Thread.Sleep(CheckInterval * 1000);
+
+                    if (!IsConnected || string.IsNullOrEmpty(ClientToken))
+                        break;
+
+                    using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                    {
+                        socket.Connect(new IPEndPoint(ServerIPAddress, ServerPort));
+                        string message = $"/check {ClientToken}";
+                        socket.Send(Encoding.UTF8.GetBytes(message));
+
+                        byte[] buffer = new byte[1024];
+                        int size = socket.Receive(buffer);
+                        string response = Encoding.UTF8.GetString(buffer, 0, size);
+
+                        if (response == "/disconnect")
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("\n[SYSTEM] Server disconnected your session.");
+                            Disconnect();
+                            break;
+                        }
+                        else if (response == "/alive")
+                        {
+                            // Токен валиден, продолжаем работу
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Token check: OK");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Token check error: {ex.Message}");
+
+                    // Если не удалось подключиться к серверу, пытаемся переподключиться
+                    if (ex is SocketException)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[SYSTEM] Server unavailable. Trying to reconnect in 30 seconds...");
+                        Thread.Sleep(30000);
+                    }
+                }
+            }
+        }
+
+        static void PeriodicallyCheckServerStatus(int intervalSeconds)
+        {
+            while (IsConnected)
+            {
+                Thread.Sleep(intervalSeconds * 1000);
+                GetServerStatus();
+            }
+        }
+
+        public static void GetServerStatus()
+        {
+            try
+            {
+                using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                {
+                    socket.Connect(new IPEndPoint(ServerIPAddress, ServerPort));
+                    string message = "/status";
+                    socket.Send(Encoding.UTF8.GetBytes(message));
+
+                    byte[] buffer = new byte[1024];
+                    int size = socket.Receive(buffer);
+                    string response = Encoding.UTF8.GetString(buffer, 0, size);
+
+                    if (response.StartsWith("/clients"))
+                    {
+                        string[] parts = response.Split(' ');
+                        string[] counts = parts[1].Split('/');
+
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Server status: {counts[0]}/{counts[1]} clients connected");
+                    }
+                }
+            }
+            catch
+            {
+                // Игнорируем ошибки при проверке статуса
+            }
+        }
+
+        public static void Disconnect()
+        {
+            ClientToken = string.Empty;
+            ClientUsername = string.Empty;
+            IsConnected = false;
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Disconnected from server.");
+        }
+
+        public static void GetStatus()
+        {
+            if (!IsConnected || string.IsNullOrEmpty(ClientToken))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Not connected to server.");
+                return;
+            }
+
+            int duration = (int)DateTime.Now.Subtract(ClientConnectDate).TotalSeconds;
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n=== Client Status ===");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Username: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(ClientUsername);
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Token: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(ClientToken);
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Server: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{ServerIPAddress}:{ServerPort}");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Connection time: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(ClientConnectDate.ToString("HH:mm:ss dd.MM.yyyy"));
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Duration: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{duration} seconds ({TimeSpan.FromSeconds(duration):hh\\:mm\\:ss})");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Status: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Connected ✓\n");
+        }
+
+        public static void OnSettings()
+        {
+            string configPath = "client.config";
+
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    string[] lines = File.ReadAllLines(configPath);
+                    if (lines.Length >= 3)
+                    {
+                        ServerIPAddress = IPAddress.Parse(lines[0]);
+                        ServerPort = int.Parse(lines[1]);
+                        CheckInterval = int.Parse(lines[2]);
+
+                        DisplaySettings();
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Error reading config: {ex.Message}");
+                }
+            }
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n=== Client Configuration ===");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Enter server IP address [127.0.0.1]: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string ipInput = Console.ReadLine();
+            ServerIPAddress = string.IsNullOrEmpty(ipInput) ? IPAddress.Loopback : IPAddress.Parse(ipInput);
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Enter server port [8888]: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string portInput = Console.ReadLine();
+            ServerPort = string.IsNullOrEmpty(portInput) ? 8888 : int.Parse(portInput);
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Enter check interval in seconds [10]: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string intervalInput = Console.ReadLine();
+            CheckInterval = string.IsNullOrEmpty(intervalInput) ? 10 : int.Parse(intervalInput);
+
+            // Сохраняем настройки
+            string[] configLines = {
+                ServerIPAddress.ToString(),
+                ServerPort.ToString(),
+                CheckInterval.ToString()
+            };
+
+            File.WriteAllLines(configPath, configLines);
+
+            DisplaySettings();
+        }
+
+        static void DisplaySettings()
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n=== Current Client Settings ===");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Server IP Address: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(ServerIPAddress.ToString());
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Server Port: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(ServerPort.ToString());
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("Check Interval: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(CheckInterval.ToString() + " seconds");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("\nTo change settings, use command: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("/config\n");
+        }
+
         static void Help()
         {
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Commands to the server: ");
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n=== Client Commands ===");
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write("/config");
-
+            Console.Write("/connect or /auth");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine(" - set initial serrings");
+            Console.WriteLine(" - Connect to license server with authentication");
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("/disconnect");
-
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine(" - disconnect users from the server");
+            Console.WriteLine(" - Disconnect from server");
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("/status");
-
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine(" - show list users");
-        }
-        static void OnSettings()
-        {
-            string Path = Directory.GetCurrentDirectory() + "/.config";
-            string IpAddress = "";
+            Console.WriteLine(" - Show client status and connection info");
 
-            if (!File.Exists(Path))
-            {
-                StreamReader streamReader = new StreamReader(Path);
-                IpAddress = streamReader.ReadLine();
-                ServerIPAddress = IPAddress.Parse(IpAddress);
-                ServerPort = int.Parse(streamReader.ReadLine());
-                MaxClient = int.Parse(streamReader.ReadLine());
-                Duration = int.Parse(streamReader.ReadLine());
-                streamReader.Close();
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Server address: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(IpAddress);
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Server port: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(ServerPort.ToString());
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Max count clients: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(ServerPort.ToString());
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Token lifetime: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(ServerPort.ToString());
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Please provide the IP address if the license server: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                ServerIPAddress = IPAddress.Parse(Console.ReadLine());
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Please specify the license server port: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                ServerPort = int.Parse(Console.ReadLine());
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Please indicate the largest number of clients: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                MaxClient = int.Parse(Console.ReadLine());
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("Specify the token lifetime: ");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Duration = int.Parse(Console.ReadLine());
-
-                StreamWriter streamWriter = new StreamWriter(Path);
-                streamWriter.WriteLine(ServerIPAddress.ToString());
-                streamWriter.WriteLine(ServerPort.ToString());
-                streamWriter.WriteLine(MaxClient.ToString());
-                streamWriter.WriteLine(Duration.ToString());
-                streamWriter.Close();
-            }
-
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.Write("To change, write the command: ");
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("/config");
+            Console.Write("/server");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(" - Check server status");
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("/config");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(" - Configure client settings");
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("/help");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(" - Show this help message");
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("/clear");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(" - Clear console");
         }
     }
 }

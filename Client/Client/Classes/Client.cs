@@ -1,23 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Client.Classes
 {
-    class Client
+    public class Client
     {
         public string Token { get; set; }
-        public DateTime DateConnect { get; set; }
+        public string Username { get; set; }
+        public DateTime ConnectDate { get; set; }
+        public string IpAddress { get; set; }
+        public int Port { get; set; }
 
         public Client()
         {
-            Random random = new Random();
-            string Chars = "QWERTYUIOPASDFGHJKLZXCVBMMqwertyuiopasdfghjklzxcvbmm0123456789";
-
-            Token = new string(Enumerable.Repeat(Chars, 15).Select(x => x[random.Next(Chars.Length)]).ToArray());
-            DateConnect = DateTime.Now;
+            ConnectDate = DateTime.Now;
         }
     }
 }
