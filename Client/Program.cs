@@ -31,34 +31,30 @@ namespace Client
 
         public static void SetCommand()
         {
-            Console.ForegroundColor = ConsoleColor.Red;
+            Console.ForegroundColor = ConsoleColor.White;
             string Command = Console.ReadLine();
 
+            string[] DataCommand = Command.Split(new string[1] { " " }, StringSplitOptions.None);
             if (Command == "/config")
             {
                 File.Delete(Directory.GetCurrentDirectory() + "/.config");
                 OnSettings();
             }
-            else if (Command == "/connect") ConnectServer();
+            else if (DataCommand[0] == "/connect") ConnectServer(DataCommand[1], DataCommand[2]);
             else if (Command == "/status") GetStatus();
             else if (Command == "/help") Help();
         }
 
-        public static void ConnectServer()
+        public static void ConnectServer(string log, string pwd)
         {
             Console.ForegroundColor = ConsoleColor.White;
 
-            Console.Write("Login: ");
-            string login = Console.ReadLine();
-
-            Console.Write("Password: ");
-            string password = Console.ReadLine();
 
             IPEndPoint endPoint = new IPEndPoint(ServerIpAddress, ServerPort);
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Connect(endPoint);
 
-            string msg = $"/connect {login} {password}";
+            string msg = $"/connect {log} {pwd}";
             socket.Send(Encoding.UTF8.GetBytes(msg));
 
             byte[] buffer = new byte[1024];
@@ -67,21 +63,21 @@ namespace Client
 
             if (response == "/auth_fail")
             {
-                Console.ForegroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine("Неверный логин или пароль.");
                 return;
             }
 
             if (response == "/banned")
             {
-                Console.ForegroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine("Ваш аккаунт находится в черном списке!");
                 return;
             }
 
             if (response == "/limit")
             {
-                Console.ForegroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine("Нет свободных лицензий.");
                 return;
             }
@@ -112,7 +108,7 @@ namespace Client
                     }
                     catch (Exception exp)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.ForegroundColor = ConsoleColor.White;
                         Console.WriteLine("Error: " + exp.Message);
                     }
 
@@ -127,7 +123,7 @@ namespace Client
                         string Response = Encoding.UTF8.GetString(Bytes, 0, ByteRec);
                         if (Response == "/disconnect")
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.ForegroundColor = ConsoleColor.White;
                             Console.WriteLine("The client is disconnected from server");
                             ClientToken = String.Empty;
                         }
